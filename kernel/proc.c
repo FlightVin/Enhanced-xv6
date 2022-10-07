@@ -156,6 +156,9 @@ found:
 static void
 freeproc(struct proc *p)
 {
+  if(p->tm_backup)
+    kfree((void*)p->tm_backup);
+  p->tm_backup = 0;
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
