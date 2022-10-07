@@ -54,6 +54,7 @@ procinit(void)
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
+      p->traceOpt = 0; // Do not trace any syscalls by default
       p->kstack = KSTACK((int) (p - proc));
   }
 }
@@ -295,6 +296,9 @@ fork(void)
     return -1;
   }
   np->sz = p->sz;
+
+  // copy parent's tracing option
+  np->traceOpt = p->traceOpt;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);

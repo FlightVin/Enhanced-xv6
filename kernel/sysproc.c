@@ -89,3 +89,24 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// edit the processes' trace option
+uint64
+sys_trace(void)
+{
+  // fetch the trace number to be applied from a0
+  int traceNum = 0;
+  argint(0, &traceNum);
+
+  if (traceNum < 0)
+  {
+    // invalid, must be non negative
+    return 1;
+  }
+
+  // apply the trace number as the trace option for current process
+  struct proc *currProc = myproc();
+  currProc->traceOpt = traceNum;
+  
+  return 0;
+}
