@@ -110,3 +110,19 @@ sys_trace(void)
   
   return 0;
 }
+
+// set an alarm to executing handler
+uint64
+sys_sigalarm(void){
+  printf("hehe\n");
+
+  return 0;
+}
+
+// reset process state
+uint64
+sys_sigreturn(void){
+  printf("hehe\n");
+
+  return 0;
+}
