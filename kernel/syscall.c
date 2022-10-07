@@ -127,6 +127,33 @@ static uint64 (*syscalls[])(void) = {
 };
 
 // An array mapping syscall numbers from syscall.h
+// to their number of arguments for printing when tracing system calls.
+int syscallArgC[] = {
+    [SYS_fork] 0,
+    [SYS_exit] 1,
+    [SYS_wait] 1,
+    [SYS_pipe] 1,
+    [SYS_read] 3,
+    [SYS_kill] 1,
+    [SYS_exec] 2,
+    [SYS_fstat] 2,
+    [SYS_chdir] 1,
+    [SYS_dup] 1,
+    [SYS_getpid] 0,
+    [SYS_sbrk] 1,
+    [SYS_sleep] 1,
+    [SYS_uptime] 0,
+    [SYS_open] 2,
+    [SYS_write] 3,
+    [SYS_mknod] 3,
+    [SYS_unlink] 1,
+    [SYS_link] 2,
+    [SYS_mkdir] 1,
+    [SYS_close] 1,
+    [SYS_trace] 1,
+};
+
+// An array mapping syscall numbers from syscall.h
 // to their names for printing when tracing system calls.
 char *syscallNames[] = {
     [SYS_fork] "fork",
@@ -153,8 +180,7 @@ char *syscallNames[] = {
     [SYS_trace] "trace",
 };
 
-void
-syscall(void)
+void syscall(void)
 {
   int num;
   struct proc *p = myproc();
@@ -177,6 +203,20 @@ syscall(void)
   // If enabled, print the pid,  syscall name, parameters aand return value
   if (p->traceOpt > 0 && (p->traceOpt & (1 << num)))
   {
-    printf("syscall %s %d %d %d-> %d\n", syscallNames[num], argraw(0), argraw(1), argraw(2), p->trapframe->a0);
+    printf("%d: syscall %s ", p->pid, syscallNames[num]); // pid and syscall name
+
+    int argCount = syscallArgC[num], argVal = 0;
+    if (argCount)
+    {
+      printf("(");
+      for (int i = 0; i < argCount; i++)
+      {
+        argint(i, &argVal);
+        printf(" %d ", argVal);
+      }
+      printf(")");
+    }
+
+    printf(" -> %d\n", p->trapframe->a0); // return value
   }
 }
