@@ -12,7 +12,7 @@ sys_exit(void)
   int n;
   argint(0, &n);
   exit(n);
-  return 0;  // not reached
+  return 0; // not reached
 }
 
 uint64
@@ -43,7 +43,7 @@ sys_sbrk(void)
 
   argint(0, &n);
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  if (growproc(n) < 0)
     return -1;
   return addr;
 }
@@ -57,8 +57,10 @@ sys_sleep(void)
   argint(0, &n);
   acquire(&tickslock);
   ticks0 = ticks;
-  while(ticks - ticks0 < n){
-    if(killed(myproc())){
+  while (ticks - ticks0 < n)
+  {
+    if (killed(myproc()))
+    {
       release(&tickslock);
       return -1;
     }
@@ -101,19 +103,20 @@ sys_trace(void)
   if (traceNum < 0)
   {
     // invalid, must be non negative
-    return 1;
+    return -1;
   }
 
   // apply the trace number as the trace option for current process
   struct proc *currProc = myproc();
   currProc->traceOpt = traceNum;
-  
+
   return 0;
 }
 
 // set an alarm to executing handler
 uint64
-sys_sigalarm(void){
+sys_sigalarm(void)
+{
   // retrieve arguments
 
   // printf("called alarm\n");
@@ -124,7 +127,8 @@ sys_sigalarm(void){
   argaddr(1, &sigalarm_handler);
   argint(0, &sigalarm_ticks);
 
-  if (sigalarm_ticks == -1 || sigalarm_ticks == -1) return -1;
+  if (sigalarm_ticks == -1 || sigalarm_handler == -1)
+    return -1;
 
   struct proc *p = myproc();
 
@@ -138,15 +142,17 @@ sys_sigalarm(void){
 
 // reset process state
 uint64
-sys_sigreturn(void){
+sys_sigreturn(void)
+{
 
   // printf("called return\n");
-  
+
   struct proc *p = myproc();
 
   // backup restoration for test1 and test2
   memmove(p->trapframe, p->tm_backup, sizeof(struct trapframe));
-  if(p->tm_backup) kfree(p->tm_backup);
+  if (p->tm_backup)
+    kfree(p->tm_backup);
   p->tm_backup = 0;
 
   p->sigalarm_en = 0;
