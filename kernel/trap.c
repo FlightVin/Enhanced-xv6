@@ -81,7 +81,7 @@ usertrap(void)
 
             // creating backup
             p->tm_backup = (struct trapframe*) kalloc();
-            *(p->tm_backup) = *(p->trapframe);
+            memmove(p->tm_backup, p->trapframe, sizeof(struct trapframe));
 
             // handling handler function
             p->trapframe->epc = p->sig_handler;
