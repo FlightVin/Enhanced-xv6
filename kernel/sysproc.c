@@ -101,7 +101,7 @@ sys_trace(void)
   if (traceNum < 0)
   {
     // invalid, must be non negative
-    return 1;
+    return -1;
   }
 
   // apply the trace number as the trace option for current process
@@ -109,4 +109,47 @@ sys_trace(void)
   currProc->traceOpt = traceNum;
   
   return 0;
+}
+
+// set an alarm to executing handler
+uint64
+sys_sigalarm(void){
+  // retrieve arguments
+
+  // printf("called alarm\n");
+
+  int sigalarm_ticks;
+  uint64 sigalarm_handler;
+
+  argaddr(1, &sigalarm_handler);
+  argint(0, &sigalarm_ticks);
+
+  if (sigalarm_ticks == -1 || sigalarm_ticks == -1) return -1;
+
+  struct proc *p = myproc();
+
+  p->sigalarm_ticks = sigalarm_ticks;
+  p->sig_handler = sigalarm_handler;
+  p->sigalarm_en = 0;
+  p->current_ticks_count = 0;
+
+  return 0;
+}
+
+// reset process state
+uint64
+sys_sigreturn(void){
+
+  // printf("called return\n");
+  
+  struct proc *p = myproc();
+
+  // backup restoration for test1 and test2
+  memmove(p->trapframe, p->tm_backup, sizeof(struct trapframe));
+  if(p->tm_backup) kfree(p->tm_backup);
+  p->tm_backup = 0;
+
+  p->sigalarm_en = 0;
+
+  return p->trapframe->a0; // to restore a0
 }

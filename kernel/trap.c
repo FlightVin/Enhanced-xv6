@@ -66,7 +66,31 @@ usertrap(void)
 
     syscall();
   } else if((which_dev = devintr()) != 0){
-    // ok
+    
+    // 2 -> timer interrupt = one tick
+    if (which_dev == 2){
+      p->current_ticks_count++;
+      if (p->sigalarm_ticks > 0){ // if we are even checking for ticks
+        if (p->sigalarm_en == 0){ // when we aren't in a sigalarm sequence
+          if (p->current_ticks_count >= p->sigalarm_ticks){
+            // we are now in a sigalarm sequence
+            p->sigalarm_en = 1;
+
+            // initialize ticks count back to 0
+            p->current_ticks_count = 0;
+
+            // creating backup
+            p->tm_backup = (struct trapframe*) kalloc();
+            memmove(p->tm_backup, p->trapframe, sizeof(struct trapframe));
+
+            // handling handler function
+            p->trapframe->epc = p->sig_handler;
+          }
+        }
+      }
+      yield();
+    }
+
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
@@ -75,10 +99,6 @@ usertrap(void)
 
   if(killed(p))
     exit(-1);
-
-  // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
 
   usertrapret();
 }
