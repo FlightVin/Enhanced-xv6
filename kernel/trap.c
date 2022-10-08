@@ -69,10 +69,9 @@ usertrap(void)
     
     // 2 -> timer interrupt = one tick
     if (which_dev == 2){
+      p->current_ticks_count++;
       if (p->sigalarm_ticks > 0){ // if we are even checking for ticks
         if (p->sigalarm_en == 0){ // when we aren't in a sigalarm sequence
-          p->current_ticks_count++;
-
           if (p->current_ticks_count >= p->sigalarm_ticks){
             // we are now in a sigalarm sequence
             p->sigalarm_en = 1;
@@ -81,14 +80,14 @@ usertrap(void)
             p->current_ticks_count = 0;
 
             // creating backup
-            
+            p->tm_backup = (struct trapframe*) kalloc();
+            *(p->tm_backup) = *(p->trapframe);
 
             // handling handler function
             p->trapframe->epc = p->sig_handler;
           }
         }
       }
-
       yield();
     }
 

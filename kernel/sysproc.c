@@ -143,6 +143,16 @@ sys_sigreturn(void){
   // printf("called return\n");
   
   struct proc *p = myproc();
+  
+  // restoring
+  p->tm_backup->kernel_hartid = p->trapframe->kernel_hartid;
+  p->tm_backup->kernel_satp = p->trapframe->kernel_satp;
+  p->tm_backup->kernel_sp = p->trapframe->kernel_sp;
+  p->tm_backup->kernel_trap = p->trapframe->kernel_trap;
+
+  *(p->trapframe) = *(p->tm_backup);
+  if(p->tm_backup) kfree(p->tm_backup);
+  p->tm_backup = 0;
 
   p->sigalarm_en = 0;
 

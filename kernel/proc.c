@@ -133,6 +133,17 @@ found:
     return 0;
   }
 
+  // CHECK
+  if((p->tm_backup = (struct trapframe *)kalloc()) == 0){
+    release(&p->lock);
+    return 0;
+  }
+
+  p->sig_handler = 0;
+  p->tm_backup = 0;
+  p->sigalarm_en = 0;
+  p->sigalarm_ticks = 0;
+
   // An empty user page table.
   p->pagetable = proc_pagetable(p);
   if(p->pagetable == 0){
