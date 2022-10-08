@@ -83,7 +83,7 @@ usertrap(void)
             p->tm_backup = (struct trapframe*) kalloc();
             memmove(p->tm_backup, p->trapframe, sizeof(struct trapframe));
 
-            // handling handler function
+            // handling handler function by changing program counter
             p->trapframe->epc = p->sig_handler;
           }
         }
