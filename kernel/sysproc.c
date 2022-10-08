@@ -101,7 +101,7 @@ sys_trace(void)
   if (traceNum < 0)
   {
     // invalid, must be non negative
-    return -1;
+    return 1;
   }
 
   // apply the trace number as the trace option for current process
