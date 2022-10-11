@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "./randomint.c"
 
 struct cpu cpus[NCPU];
 
@@ -54,7 +55,8 @@ void procinit(void)
   {
     initlock(&p->lock, "proc");
     p->state = UNUSED;
-    p->traceOpt = 0; // Do not trace any syscalls by default
+    p->trace_opt = 0; // Do not trace any syscalls by default
+    p->tickets = 1;
     p->kstack = KSTACK((int)(p - proc));
   }
 }
@@ -128,7 +130,8 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
-  p->cTime = ticks; // Creation time of the process in ticks
+  p->creation_time = ticks; // Creation time of the process in ticks
+  p->tickets = 1;           // default tickets is 1
 
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0)
@@ -176,8 +179,9 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
-  p->traceOpt = 0;
-  p->cTime = 0;
+  p->trace_opt = 0;
+  p->creation_time = 0;
+  p->tickets = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -309,7 +313,10 @@ int fork(void)
   np->sz = p->sz;
 
   // copy parent's tracing option
-  np->traceOpt = p->traceOpt;
+  np->trace_opt = p->trace_opt;
+
+  // copy parent's tickets
+  np->tickets = p->tickets;
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
@@ -508,7 +515,7 @@ void scheduler(void)
       acquire(&p->lock);
       if (p->state == RUNNABLE)
       {
-        if (firstP == 0 || p->cTime < firstP->cTime) // pick earliest created process
+        if (firstP == 0 || p->creation_time < firstP->creation_time) // pick earliest created process
         {
           if (firstP > 0) // if different process already assumed to be first
           {
@@ -536,6 +543,54 @@ void scheduler(void)
       // It should have changed its p->state before coming back.
       c->proc = 0;
       release(&p->lock); // since process is done executing we can release its lock
+    }
+  }
+#endif
+#ifdef LBS
+  for (;;)
+  {
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    int total_tickets = 0; // total number of tickets currently held by runnable processes
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE)
+      {
+        total_tickets += p->tickets;
+      }
+      release(&p->lock);
+    }
+
+    int winning_tickets = 1;
+    
+    if (total_tickets)
+      winning_tickets = next() % total_tickets + 1; // winning ticket, randomly generated between 1 and total_tickets
+
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE)
+      {
+        winning_tickets -= p->tickets;
+      }
+      if (winning_tickets <= 0)
+      {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+        release(&p->lock);
+        break;
+      }
+      release(&p->lock);
     }
   }
 #endif

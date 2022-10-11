@@ -91,7 +91,7 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
-  uint cTime;                  // Ticks when process was created
+  
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 
@@ -105,12 +105,14 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  int traceOpt;                // Numbers of system calls to be traced
+  int trace_opt;                // Numbers of system calls to be traced
 
   int sigalarm_en;             // If non-zero, then in middle of sigalarm
   int sigalarm_ticks;          // number of ticks before calling handler
   uint64 sig_handler;          // handler for sigalarm
 
   int current_ticks_count;     // Number of ticks till now
-  struct trapframe *tm_backup;  // backup for trapframe in case register data is lost
+  struct trapframe *tm_backup; // backup for trapframe in case register data is lost
+  uint creation_time;          // Ticks when process was created
+  int tickets;                 // Number of tickets the process holds
 };

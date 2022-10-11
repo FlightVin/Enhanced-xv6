@@ -100,6 +100,7 @@ extern uint64 sys_close(void);
 extern uint64 sys_trace(void);
 extern uint64 sys_sigalarm(void);
 extern uint64 sys_sigreturn(void);
+extern uint64 sys_settickets(void);
 
 // An array mapping syscall numbers from syscall.h
 // to the function that handles the system call.
@@ -128,11 +129,12 @@ static uint64 (*syscalls[])(void) = {
     [SYS_trace] sys_trace,
     [SYS_sigalarm] sys_sigalarm,
     [SYS_sigreturn] sys_sigreturn,
+    [SYS_settickets] sys_settickets,
 };
 
 // An array mapping syscall numbers from syscall.h
 // to their number of arguments for printing when tracing system calls.
-int syscallArgC[] = {
+int syscall_argc[] = {
     [SYS_fork] 0,
     [SYS_exit] 1,
     [SYS_wait] 1,
@@ -157,11 +159,12 @@ int syscallArgC[] = {
     [SYS_trace] 1,
     [SYS_sigalarm] 2,
     [SYS_sigreturn] 0,
+    [SYS_settickets] 1,
 };
 
 // An array mapping syscall numbers from syscall.h
 // to their names for printing when tracing system calls.
-char *syscallNames[] = {
+char *syscall_names[] = {
     [SYS_fork] "fork",
     [SYS_exit] "exit",
     [SYS_wait] "wait",
@@ -184,6 +187,7 @@ char *syscallNames[] = {
     [SYS_mkdir] "mkdir",
     [SYS_close] "close",
     [SYS_trace] "trace",
+    [SYS_settickets] "settickets",
 };
 
 void syscall(void)
@@ -192,6 +196,12 @@ void syscall(void)
   struct proc *p = myproc();
 
   num = p->trapframe->a7;
+
+  // save the registers a0 to a6 (they contain arguments for the system calls)
+  int args_copy[6];
+  for (int i = 0; i < 6; i++)
+    argint(i, &args_copy[i]);
+
   if (num > 0 && num < NELEM(syscalls) && syscalls[num])
   {
     // Use num to lookup the system call function for num, call it,
@@ -207,20 +217,19 @@ void syscall(void)
 
   // Check if tracing enabled for this syscall for this process
   // If enabled, print the pid,  syscall name, parameters aand return value
-  if (p->traceOpt > 0 && (p->traceOpt & (1 << num)))
+  if (p->trace_opt > 0 && (p->trace_opt & (1 << num)))
   {
-    printf("%d: syscall %s ", p->pid, syscallNames[num]); // pid and syscall name
+    printf("%d: syscall %s ", p->pid, syscall_names[num]); // pid and syscall name
 
-    int argCount = syscallArgC[num], argVal = 0;
+    int argCount = syscall_argc[num];
     if (argCount)
     {
       printf("(");
       for (int i = 0; i < argCount; i++)
       {
-        argint(i, &argVal);
-        printf(" %d ", argVal);
+        printf("%d ", args_copy[i]);
       }
-      printf(")");
+      printf("\b)");
     }
 
     printf(" -> %d\n", p->trapframe->a0); // return value
