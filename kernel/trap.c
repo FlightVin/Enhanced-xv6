@@ -50,7 +50,63 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
-  if(r_scause() == 8){
+ if (r_scause() == 15 || r_scause() == 13){
+    // page fault
+
+    // get lower page aligned address
+    uint64 va = PGROUNDDOWN(r_stval());
+
+    if (va >= MAXVA)
+      p->killed = 1;
+    else {
+
+      pte_t* pte = walk(p->pagetable, va, 0);
+
+      if (pte != 0){
+        uint flags = PTE_FLAGS(*pte);
+        // check validity of PTE
+        if ((flags & PTE_V) != 0){
+          // check whether COW
+          if ((flags & PTE_COW) != 0){
+            
+            // add write flag
+            flags = flags | PTE_W;
+
+            // remove COW flag
+            flags = flags & (~PTE_COW);
+
+            void* mem = kalloc();
+            if (mem == 0){
+              p->killed = 1;
+            } else {
+              // get phsical address
+              uint64 pa = PTE2PA(*pte);
+
+              // updating PTE
+              // mapping physial address - 
+              *pte = PA2PTE(mem);
+              // adding new flags
+              *pte = *pte | flags;
+
+              // copy information from pa to the new memory space
+              memmove(mem, (void*)pa, PGSIZE);
+
+              // freeing the page of memory pointed by pa, i.e., 
+              kfree((void*)pa);
+            }
+
+          } else {
+            p->killed = 1;
+          }
+        } else {
+          p->killed = 1;
+        }
+      } else {
+        p->killed = 1;
+      }
+    }
+
+  } else if(r_scause() == 8){
     // system call
 
     if(killed(p))

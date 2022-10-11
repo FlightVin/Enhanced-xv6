@@ -344,6 +344,11 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // user can access
 
+// lower 10 bits of PTE are used for flags
+// out of these bits 8 and 9 are "Reserved for supervisor software"
+// so we can use bit 9 to detect when a pagetable for COW
+#define PTE_COW (1L<<9)
+
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
 

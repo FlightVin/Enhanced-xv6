@@ -23,9 +23,32 @@ struct {
   struct run *freelist;
 } kmem;
 
+#define phys_address_number PGROUNDUP(PHYSTOP)/PGSIZE
+
+struct spinlock pte_updation_lock;
+int pte_count[phys_address_number];
+
+void increase_pte_count(void* pa){
+  acquire(&pte_updation_lock);
+  pte_count[(uint64)pa/PGSIZE]++;
+  release(&pte_updation_lock);
+}
+
+void decrease_pte_count(void* pa){
+  acquire(&pte_updation_lock);
+  pte_count[(uint64)pa/PGSIZE]--;
+  release(&pte_updation_lock);
+}
+
 void
 kinit()
 {
+  initlock(&pte_updation_lock, "pte_updation_lock");
+  acquire(&pte_updation_lock);
+  // all physical pages initially have 0 ptes referencing them
+  for (int i = 0; i<phys_address_number; i++) pte_count[i] = 0;
+  release(&pte_updation_lock);
+
   initlock(&kmem.lock, "kmem");
   freerange(end, (void*)PHYSTOP);
 }
@@ -34,6 +57,11 @@ void
 freerange(void *pa_start, void *pa_end)
 {
   char *p;
+
+  p = (char*)PGROUNDUP((uint64)pa_start);
+  for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
+    increase_pte_count(p);
+
   p = (char*)PGROUNDUP((uint64)pa_start);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
@@ -50,6 +78,14 @@ kfree(void *pa)
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
+
+  acquire(&pte_updation_lock);
+  pte_count[(uint64)pa/PGSIZE]--;
+  if (pte_count[(uint64)pa/PGSIZE] > 0){
+    release(&pte_updation_lock);
+    return;
+  }
+  release(&pte_updation_lock);
 
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
@@ -78,5 +114,9 @@ kalloc(void)
 
   if(r)
     memset((char*)r, 5, PGSIZE); // fill with junk
+
+  if(r)
+    increase_pte_count(r);
+
   return (void*)r;
 }

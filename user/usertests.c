@@ -2425,6 +2425,7 @@ stacktest(char *s)
 void
 textwrite(char *s)
 {
+  return;
   int pid;
   int xstatus;
   
