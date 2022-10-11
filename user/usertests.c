@@ -2595,7 +2595,9 @@ struct test {
   {exectest, "exectest"},
   {pipe1, "pipe1"},
   {killstatus, "killstatus"},
+  #ifndef FCFS
   {preempt, "preempt"},
+  #endif
   {exitwait, "exitwait"},
   {reparent, "reparent" },
   {twochildren, "twochildren"},

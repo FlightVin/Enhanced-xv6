@@ -97,10 +97,10 @@ uint64
 sys_trace(void)
 {
   // fetch the trace number to be applied from a0
-  int traceNum = 0;
-  argint(0, &traceNum);
+  int trace_num = 0;
+  argint(0, &trace_num);
 
-  if (traceNum < 0)
+  if (trace_num < 0)
   {
     // invalid, must be non negative
     return -1;
@@ -108,7 +108,7 @@ sys_trace(void)
 
   // apply the trace number as the trace option for current process
   struct proc *currProc = myproc();
-  currProc->traceOpt = traceNum;
+  currProc->trace_opt = trace_num;
 
   return 0;
 }
@@ -158,4 +158,41 @@ sys_sigreturn(void)
   p->sigalarm_en = 0;
 
   return p->trapframe->a0; // to restore a0
+}
+
+// sets the number of tickets the current process has
+uint64
+sys_settickets(void)
+{
+  // read ticket number argument
+  int ticket_count = 0;
+  argint(0, &ticket_count);
+
+  if (ticket_count <= 0)
+  {
+    // process must have >= 1 ticket
+    return -1;
+  }
+
+  struct proc *p = myproc();
+  p->tickets = ticket_count;
+
+  return 0;
+}
+
+uint64
+sys_waitx(void)
+{
+  uint64 addr, addr1, addr2;
+  uint wtime, rtime;
+  argaddr(0, &addr);
+  argaddr(1, &addr1); // user virtual memory
+  argaddr(2, &addr2);
+  int ret = waitx(addr, &wtime, &rtime);
+  struct proc* p = myproc();
+  if (copyout(p->pagetable, addr1,(char*)&wtime, sizeof(int)) < 0)
+    return -1;
+  if (copyout(p->pagetable, addr2,(char*)&rtime, sizeof(int)) < 0)
+    return -1;
+  return ret;
 }
