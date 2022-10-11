@@ -89,7 +89,9 @@ usertrap(void)
         }
       }
 #ifndef FCFS
+#ifndef PBS
       yield(); // disable preemption if FCFS is selected
+#endif
 #endif
     }
 
@@ -174,8 +176,10 @@ kerneltrap()
 
   // give up the CPU if this is a timer interrupt.
 #ifndef FCFS
+#ifndef PBS
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield(); // disable preemption if FCFS is selected
+#endif
 #endif
 
   // the yield() may have caused some traps to occur,

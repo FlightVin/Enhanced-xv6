@@ -157,6 +157,10 @@ found:
   p->tickets = 1;           // default tickets is 1
   p->run_time = 0;
   p->exit_time = 0;
+  p->sleep_time = 0;
+  p->num_scheduled = 0;
+  p->static_priority = 60;
+  p->niceness = 5;
 
   return p;
 }
@@ -186,6 +190,10 @@ freeproc(struct proc *p)
   p->tickets = 0;
   p->run_time = 0;
   p->exit_time = 0;
+  p->sleep_time = 0;
+  p->num_scheduled = 0;
+  p->static_priority = 0;
+  p->niceness = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -528,8 +536,57 @@ update_time()
     if (p->state == RUNNING) {
       p->run_time++;
     }
+    else if (p->state == SLEEPING) {
+      p->sleep_time++;
+    }
     release(&p->lock); 
   }
+}
+
+int set_priority(int new_priority, int pid)
+{
+  struct proc *p;
+
+  for (p = proc; p < &proc[NPROC]; p++)
+  {
+    acquire(&p->lock);
+    if (p->pid == pid) // check if same pid
+    {
+      int previous_priority = p->static_priority; // for return
+      p->static_priority = new_priority;
+      // reset niceness, run and sleep time
+      p->run_time = 0;
+      p->sleep_time = 0;
+      p->niceness = 5;
+
+      release(&p->lock); // release lock before returning from function
+      if (previous_priority > new_priority) // check if rescheduling necessary
+      {
+        // reschedule if priority increases(value decreases)
+        yield();
+      }
+
+      return previous_priority;
+    }
+    release(&p->lock);
+  }
+
+  return -1; // pid not found
+}
+
+// calculate dynamic priority of a process
+// also updates niceness
+int dynamic_priority(struct proc *p)
+{
+  if (p->run_time > 0) // if the process has already run, update niceness else default 5 remains
+  {
+    p->niceness = (p->run_time / (p->run_time + p->sleep_time)) * 10;
+  }
+  int dp = p->static_priority - p->niceness + 5;
+  dp = 100 > dp ? dp : 100;
+  dp = 0 > dp ? 0 : dp;
+
+  return dp;
 }
 
 // Per-CPU process scheduler.
@@ -560,6 +617,7 @@ void scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        p->num_scheduled++;
         c->proc = p;
         // printf("rr\n");
         swtch(&c->context, &p->context);
@@ -604,6 +662,7 @@ void scheduler(void)
       // to release its lock and then reacquire it
       // before jumping back to us.
       p->state = RUNNING;
+      p->num_scheduled++;
       c->proc = p;
       // printf("fcfs\n");
       swtch(&c->context, &p->context);
@@ -650,6 +709,7 @@ void scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        p->num_scheduled++;
         c->proc = p;
         swtch(&c->context, &p->context);
 
@@ -660,6 +720,62 @@ void scheduler(void)
         break;
       }
       release(&p->lock);
+    }
+  }
+#endif
+#ifdef PBS
+  for (;;)
+  {
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    int highest_priority = 0;
+    struct proc *highest_proc = 0;
+
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      acquire(&p->lock);
+      if (p->state == RUNNABLE)
+      {
+        int dp = dynamic_priority(p);
+        if (highest_proc == 0)
+        {
+          highest_proc = p;
+          highest_priority = dp;
+          continue;
+        }
+        int cases[] = {
+          [0] dp < highest_priority,
+          [1] dp == highest_priority && p->num_scheduled < highest_proc->num_scheduled,
+          [2] dp == highest_priority && p->num_scheduled == highest_proc->num_scheduled && p->creation_time < highest_proc->creation_time,
+        };
+        if (cases[0] || cases[1] || cases[2])
+        {
+          release(&highest_proc->lock);
+          highest_priority = dp;
+          highest_proc = p;
+          continue;
+        }
+      }
+      release(&p->lock);
+    }
+
+    p = highest_proc;
+    if (p != 0)
+    {
+      // Switch to chosen process.  It is the process's job
+      // to release its lock and then reacquire it
+      // before jumping back to us.
+      p->state = RUNNING;
+      p->num_scheduled++;
+      c->proc = p;
+      // printf("pbs\n");
+      swtch(&c->context, &p->context);
+
+      // Process is done running.
+      // It should have changed its p->state before coming back.
+      c->proc = 0;
+      release(&p->lock); // since process is done executing we can release its lock
     }
   }
 #endif
@@ -864,6 +980,19 @@ void procdump(void)
   struct proc *p;
   char *state;
 
+  #ifdef RR
+  printf("Using round robin");
+  #endif
+  #ifdef FCFS
+  printf("Using fcfs");
+  #endif
+  #ifdef PBS
+  printf("Using pbs");
+  #endif
+  #ifdef MLFQ
+  printf("using mlfq");
+  #endif
+
   printf("\n");
   for (p = proc; p < &proc[NPROC]; p++)
   {
@@ -873,7 +1002,10 @@ void procdump(void)
       state = states[p->state];
     else
       state = "???";
-    printf("%d %s %s", p->pid, state, p->name);
+    printf("%d %s %s %d", p->pid, state, p->name, p->creation_time);
+    #ifdef PBS
+    printf(" %d",dynamic_priority(p));
+    #endif
     printf("\n");
   }
 }

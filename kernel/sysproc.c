@@ -164,6 +164,7 @@ sys_sigreturn(void)
 uint64
 sys_settickets(void)
 {
+  #ifdef LBS
   // read ticket number argument
   int ticket_count = 0;
   argint(0, &ticket_count);
@@ -178,6 +179,10 @@ sys_settickets(void)
   p->tickets = ticket_count;
 
   return 0;
+  #endif
+
+  printf("Error, lottery based scheduler must be chosen to use this command.\n");
+  return -1;
 }
 
 uint64
@@ -195,4 +200,25 @@ sys_waitx(void)
   if (copyout(p->pagetable, addr2,(char*)&rtime, sizeof(int)) < 0)
     return -1;
   return ret;
+}
+
+// Change the static priority of the current process
+uint64
+sys_set_priority(void)
+{
+  #ifdef PBS
+  int new_priority, pid;
+  argint(0, &new_priority);
+  argint(1, &pid);
+  if (pid < 0 || new_priority < 0)
+  {
+    // pid and static priority must be positive
+    return -1;
+  }
+
+  return set_priority(new_priority, pid); 
+  #endif
+
+  printf("Error, priority based scheduler must be chosen to use this command.\n");
+  return -1;
 }

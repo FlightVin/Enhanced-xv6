@@ -141,6 +141,7 @@ UPROGS=\
 	$U/_alarmtest\
 	$U/_time\
 	$U/_schedulertest\
+	$U/_setpriority\
 
 fs.img: mkfs/mkfs README $(UPROGS)
 	mkfs/mkfs fs.img README $(UPROGS)

@@ -2596,7 +2596,9 @@ struct test {
   {pipe1, "pipe1"},
   {killstatus, "killstatus"},
   #ifndef FCFS
+  #ifndef PBS
   {preempt, "preempt"},
+  #endif
   #endif
   {exitwait, "exitwait"},
   {reparent, "reparent" },

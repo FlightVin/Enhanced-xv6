@@ -118,4 +118,9 @@ struct proc {
 
   uint run_time;               // How long the process has run
   uint exit_time;              // When the process exited
+
+  uint sleep_time;             // How long the process has been sleeping
+  int num_scheduled;           // Number of times the process has been scheduled
+  int static_priority;         // Static priority
+  int niceness;
 };
