@@ -986,6 +986,9 @@ void procdump(void)
   #ifdef FCFS
   printf("Using fcfs");
   #endif
+  #ifdef LBS
+  printf("using lbs");
+  #endif
   #ifdef PBS
   printf("Using pbs");
   #endif
