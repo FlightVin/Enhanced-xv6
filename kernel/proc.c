@@ -130,9 +130,6 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
-  p->creation_time = ticks; // Creation time of the process in ticks
-  p->tickets = 1;           // default tickets is 1
-
   // Allocate a trapframe page.
   if ((p->trapframe = (struct trapframe *)kalloc()) == 0)
   {
@@ -155,6 +152,11 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
+
+  p->creation_time = ticks; // Creation time of the process in ticks
+  p->tickets = 1;           // default tickets is 1
+  p->run_time = 0;
+  p->exit_time = 0;
 
   return p;
 }
@@ -182,6 +184,8 @@ freeproc(struct proc *p)
   p->trace_opt = 0;
   p->creation_time = 0;
   p->tickets = 0;
+  p->run_time = 0;
+  p->exit_time = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -401,6 +405,7 @@ void exit(int status)
 
   p->xstate = status;
   p->state = ZOMBIE;
+  p->exit_time = ticks;
 
   release(&wait_lock);
 
@@ -460,6 +465,70 @@ int wait(uint64 addr)
 
     // Wait for a child to exit.
     sleep(p, &wait_lock); // DOC: wait-sleep
+  }
+}
+
+// Wait for a child process to exit and return its pid.
+// Return -1 if this process has no children.
+int
+waitx(uint64 addr, uint* wtime, uint* rtime)
+{
+  struct proc *np;
+  int havekids, pid;
+  struct proc *p = myproc();
+
+  acquire(&wait_lock);
+
+  for(;;){
+    // Scan through table looking for exited children.
+    havekids = 0;
+    for(np = proc; np < &proc[NPROC]; np++){
+      if(np->parent == p){
+        // make sure the child isn't still in exit() or swtch().
+        acquire(&np->lock);
+
+        havekids = 1;
+        if(np->state == ZOMBIE){
+          // Found one.
+          pid = np->pid;
+          *rtime = np->run_time;
+          *wtime = np->exit_time - np->creation_time - np->run_time;
+          if(addr != 0 && copyout(p->pagetable, addr, (char *)&np->xstate,
+                                  sizeof(np->xstate)) < 0) {
+            release(&np->lock);
+            release(&wait_lock);
+            return -1;
+          }
+          freeproc(np);
+          release(&np->lock);
+          release(&wait_lock);
+          return pid;
+        }
+        release(&np->lock);
+      }
+    }
+
+    // No point waiting if we don't have any children.
+    if(!havekids || p->killed){
+      release(&wait_lock);
+      return -1;
+    }
+
+    // Wait for a child to exit.
+    sleep(p, &wait_lock);  //DOC: wait-sleep
+  }
+}
+
+void
+update_time()
+{
+  struct proc* p;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if (p->state == RUNNING) {
+      p->run_time++;
+    }
+    release(&p->lock); 
   }
 }
 

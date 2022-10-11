@@ -115,4 +115,7 @@ struct proc {
   struct trapframe *tm_backup; // backup for trapframe in case register data is lost
   uint creation_time;          // Ticks when process was created
   int tickets;                 // Number of tickets the process holds
+
+  uint run_time;               // How long the process has run
+  uint exit_time;              // When the process exited
 };
