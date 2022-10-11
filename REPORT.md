@@ -40,6 +40,6 @@ Since it is non preemptive, turn off yielding in `trap.c`.
 
 ## Analysis  
 RR : Avg rtime 120, avg wtime 19  
-FCFS :  Avg rtime 108, avg time 21  
+FCFS :  Avg rtime 72, avg time 61  
 LBS : Average rtime 127,  wtime 12  
 PBS : Average rtime 109,  wtime 24
