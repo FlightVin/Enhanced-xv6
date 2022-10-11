@@ -56,7 +56,7 @@ usertrap(void)
     // get lower page aligned address
     uint64 va = PGROUNDDOWN(r_stval());
 
-    if (va >= MAXVA)
+    if (va >= MAXVA || va == 0)
       p->killed = 1;
     else {
 
