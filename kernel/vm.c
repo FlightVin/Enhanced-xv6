@@ -308,7 +308,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
   pte_t *pte;
   uint64 pa, i;
   uint flags;
-  char *mem;
+  // char *mem; // no longer required since not allocation memory
 
   for(i = 0; i < sz; i += PGSIZE){
     if((pte = walk(old, i, 0)) == 0)
@@ -316,14 +316,36 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     if((*pte & PTE_V) == 0)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
-    flags = PTE_FLAGS(*pte);
-    if((mem = kalloc()) == 0)
-      goto err;
-    memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
-      kfree(mem);
+    flags = PTE_FLAGS(*pte); // gets lower 10 bits of PTE
+    // if((mem = kalloc()) == 0)
+    //   goto err;
+    // memmove(mem, (char*)pa, PGSIZE);
+    // if(mappages(new, i, PGSIZE, (uint64)mem, flags) != 0){
+    //   kfree(mem);
+    //   goto err;
+    // }
+
+    // checking is write flag is installed
+    if ((flags & PTE_W) != 0){
+      flags = flags & (~PTE_W); // removing write
+    }
+
+    // adding flag for COW
+    flags = flags | PTE_COW;
+
+    // updating PTE
+    // mapping physial address - 
+    *pte = PA2PTE(pa);
+    // adding new flags
+    *pte = *pte | flags;
+
+    // map parents pa's to child
+    if (mappages(new, i, PGSIZE, pa, flags) != 0){
       goto err;
     }
+    
+    // add refernece to the physical page that a new pte also refers to it
+    increase_pte_count((void*)pa);
   }
   return 0;
 
@@ -355,9 +377,48 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
+    if (va0 >= MAXVA)
+      return -1;
+
     pa0 = walkaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
+
+    pte_t* pte = walk(pagetable, va0, 0);
+    if (pte == 0)
+      return -1;
+
+    uint64 flags = PTE_FLAGS(*pte);
+
+    if ((flags & PTE_COW) != 0){ // whether it is cow
+      uint64 pa = PTE2PA(*pte);
+
+      if (pa == 0)
+        return -1;
+
+      // adding write flag
+       flags = flags | PTE_W;
+
+       // removing cow flag
+       flags = flags & (~PTE_COW);
+
+       char* mem = kalloc();
+      if (mem == 0)
+         return -1;
+
+      // new memory
+      memmove(mem, (void*)pa, PGSIZE);
+
+      // updating pte
+      *pte = PA2PTE(mem);
+      *pte = *pte | flags;
+
+      // remove pte reference
+      kfree((void*) pa);
+
+      pa0 = walkaddr(pagetable, va0);
+    }
+
     n = PGSIZE - (dstva - va0);
     if(n > len)
       n = len;
