@@ -39,7 +39,7 @@ In `scheduler` function in `proc.c`, created variables to track the process with
 Since it is non preemptive, turn off yielding in `trap.c`.  
 
 ## Analysis  
-RR : Avg rtime 120, avg wtime 19  
-FCFS :  Avg rtime 72, avg time 61  
-LBS : Average rtime 127,  wtime 12  
-PBS : Average rtime 109,  wtime 24
+RR : Avg rtime 25, avg wtime 120  
+FCFS :  Avg rtime 74, avg time 87  
+LBS : Average rtime 23,  wtime 133  
+PBS : Average rtime 32,  wtime 111
