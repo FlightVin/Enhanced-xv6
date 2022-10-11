@@ -161,6 +161,9 @@ found:
   p->num_scheduled = 0;
   p->static_priority = 60;
   p->niceness = 5;
+  p->wait_time = 0;
+  p->is_in_queue = 0;
+  p->queue_num = 0;
 
   return p;
 }
@@ -194,6 +197,9 @@ freeproc(struct proc *p)
   p->num_scheduled = 0;
   p->static_priority = 0;
   p->niceness = 0;
+  p->wait_time = 0;
+  p->is_in_queue = 0;
+  p->queue_num = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -538,6 +544,10 @@ update_time()
     }
     else if (p->state == SLEEPING) {
       p->sleep_time++;
+      p->wait_time++;
+    }
+    else if (p->state == RUNNABLE) {
+      p->wait_time++;
     }
     release(&p->lock); 
   }
@@ -745,9 +755,9 @@ void scheduler(void)
           continue;
         }
         int cases[] = {
-          [0] dp < highest_priority,
-          [1] dp == highest_priority && p->num_scheduled < highest_proc->num_scheduled,
-          [2] dp == highest_priority && p->num_scheduled == highest_proc->num_scheduled && p->creation_time < highest_proc->creation_time,
+          [0] dp < highest_priority, // default update case
+          [1] dp == highest_priority && p->num_scheduled < highest_proc->num_scheduled, // number of schedules tiebreaker
+          [2] dp == highest_priority && p->num_scheduled == highest_proc->num_scheduled && p->creation_time < highest_proc->creation_time, // creation time tiebreaker
         };
         if (cases[0] || cases[1] || cases[2])
         {

@@ -38,6 +38,10 @@ Implemented `set_priority` system call to change the static priority of a proces
 In `scheduler` function in `proc.c`, created variables to track the process with highest priority(numerically lowest dynamic priority value) and its dynamic priority. Made an array `cases` with the case and tiebreakers when the highest priority process must be changed to the current process. Check if any of the entries in `cases` is true to update highest priority process. On finding the highest priority process, run it and increment `num_scheduled`.    
 Since it is non preemptive, turn off yielding in `trap.c`.  
 
+### Multilevel Feedback Queue
+Enable with : `make clean; make qemu SCHEDULER=MLFQ`  
+**Exploitation of MLFQ by a process**: Since if a process exceeds its time slice it gets pushed to a lower queue but if voluntarily relinquishes control, it goes to the back of the same queue, a process can yield the CPU before its time slice expires to stay in the same queue, bypassing the deprioritasition. 
+
 ## Analysis  
 RR : Avg rtime 25, avg wtime 120  
 FCFS :  Avg rtime 74, avg time 87  
