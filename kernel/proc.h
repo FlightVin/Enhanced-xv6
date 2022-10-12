@@ -127,4 +127,5 @@ struct proc {
   uint wait_time;             // Time spent waiting in queue
   int is_in_queue;            // Check if process is currently in a queue
   int queue_num;              // Which queue the process is in
+  int curr_run_time;
 };

@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "mlfq.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -146,8 +147,33 @@ usertrap(void)
       }
 #ifndef FCFS
 #ifndef PBS
+#ifndef MLFQ
       yield(); // disable preemption if FCFS is selected
 #endif
+#endif
+#endif
+
+#ifdef MLFQ
+      if (p->state == RUNNING)
+      {
+        p->curr_run_time++;
+
+        for (int i = 0; i < p->queue_num; i++)
+        {
+          if (mlfq_queue.proc_queue_size[i] != 0)
+          {
+            enque(p->queue_num, p);
+            yield();
+          }
+        }
+
+        if (p->curr_run_time >= mlfq_queue.proc_queue_max_allowable_ticks[p->queue_num])
+        {
+          deque(p->queue_num);
+          enque(4 < p->queue_num + 1 ? 4 : p->queue_num + 1, p);
+          yield();
+        }
+      }
 #endif
     }
 
@@ -233,9 +259,33 @@ kerneltrap()
   // give up the CPU if this is a timer interrupt.
 #ifndef FCFS
 #ifndef PBS
+#ifndef MLFQ
   if(which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING)
     yield(); // disable preemption if FCFS is selected
 #endif
+#endif
+#endif
+
+#ifdef MLFQ
+      struct proc *p = myproc();
+      if (p->state == RUNNING)
+        p->curr_run_time++;
+
+      for (int i = 0; i < p->queue_num; i++)
+      {
+        if (mlfq_queue.proc_queue_size[i] != 0)
+        {
+          enque(p->queue_num, p);
+          yield();
+        }
+      }
+      
+      if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && p->curr_run_time >= mlfq_queue.proc_queue_max_allowable_ticks[p->queue_num])
+      {
+        deque(p->queue_num);
+        enque(4 < p->queue_num + 1 ? 4 : p->queue_num + 1, p);
+        yield();
+      }
 #endif
 
   // the yield() may have caused some traps to occur,

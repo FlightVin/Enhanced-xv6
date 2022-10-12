@@ -6,6 +6,7 @@
 #include "proc.h"
 #include "defs.h"
 #include "./randomint.c"
+#include "./mlfq.h"
 
 struct cpu cpus[NCPU];
 
@@ -164,6 +165,7 @@ found:
   p->wait_time = 0;
   p->is_in_queue = 0;
   p->queue_num = 0;
+  p->curr_run_time = 0;
 
   return p;
 }
@@ -200,6 +202,7 @@ freeproc(struct proc *p)
   p->wait_time = 0;
   p->is_in_queue = 0;
   p->queue_num = 0;
+  p->curr_run_time = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -789,6 +792,60 @@ void scheduler(void)
     }
   }
 #endif
+#ifdef MLFQ
+  for (;;)
+  {
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+
+    for (p = proc; p < &proc[NPROC]; p++)
+    {
+      acquire(&p->lock);
+      if (p->wait_time > AGETIME && p->is_in_queue == 1) // check if process has to be aged
+      {
+        if (p->queue_num != 0)
+        {
+          remove_from_between(p->queue_num, p);
+          enque(p->queue_num - 1, p);
+        }
+        release(&p->lock);
+        continue;
+      }
+      if (p->state == RUNNABLE && p->is_in_queue == 0 && mlfq_queue.proc_queue_size[0] != NPROC - 1) // new process, push to queue
+      {
+        enque(0, p);
+      }
+      release(&p->lock);
+    }
+
+    for (int i = 0; i < 5; i++)
+    {
+      if (mlfq_queue.proc_queue_size[i] != 0)
+      {
+        p = deque(i);
+        if (p != 0)
+        {
+          acquire(&p->lock);
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          p->num_scheduled++;
+          c->proc = p;
+          // printf("pbs\n");
+          swtch(&c->context, &p->context);
+
+          // Process is done running.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+          release(&p->lock);
+          break;
+        }
+      }
+    }
+
+  }
+#endif
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -1019,6 +1076,16 @@ void procdump(void)
     #ifdef PBS
     printf(" %d",dynamic_priority(p));
     #endif
+    #ifdef MLFQ
+    printf(" in queue?%s queue num%d", p->is_in_queue == 1 ? "yes" : "no", p->queue_num);
+    printf(" run time %d, wait time %d", p->curr_run_time, p->wait_time);
+    #endif
     printf("\n");
   }
+  #ifdef MLFQ
+  printf("queue sizes : ");
+  for (int i = 0; i < 5; i++)
+    printf("%d ", mlfq_queue.proc_queue_size[i]);
+  printf("\n");
+  #endif
 }

@@ -41,5 +41,7 @@ main()
     plicinithart();   // ask PLIC for device interrupts
   }
 
+  mlfq_queue_initialization();
+
   scheduler();        
 }

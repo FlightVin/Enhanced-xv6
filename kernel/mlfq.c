@@ -9,12 +9,6 @@
 
 #include "mlfq.h"
 
-struct _mlfq_queue{
-    struct proc* proc_queues[5][NPROC];     // the multilevel queues
-    int proc_queue_size[5];                 // number of processes in the queue
-    int proc_queue_max_allowable_ticks[5];  // the maximum number of ticks before preemption
-};
-
 struct _mlfq_queue mlfq_queue;
 
 void mlfq_queue_initialization(){
@@ -27,6 +21,7 @@ void mlfq_queue_initialization(){
             mlfq_queue.proc_queues[i][j] = 0;
         }
     }
+    mlfq_queue.proc_queue_max_allowable_ticks[0] = 100;
 }
 
 void enque(int queue_number, struct proc* p){
@@ -41,6 +36,7 @@ void enque(int queue_number, struct proc* p){
     p->wait_time = 0;
     p->queue_num = queue_number;
     p->is_in_queue = 1;
+    p->curr_run_time = 0;
 }
 
 // returns the process itself if found in queue
@@ -108,6 +104,8 @@ struct proc* deque(int queue_number){
             // the process is no longer in a queue
             p->is_in_queue = 0;
 
+            p->curr_run_time = 0;
+            
             return p;
         }
     }    
