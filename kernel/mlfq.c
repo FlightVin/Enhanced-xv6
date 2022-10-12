@@ -21,7 +21,6 @@ void mlfq_queue_initialization(){
             mlfq_queue.proc_queues[i][j] = 0;
         }
     }
-    mlfq_queue.proc_queue_max_allowable_ticks[0] = 100;
 }
 
 void enque(int queue_number, struct proc* p){

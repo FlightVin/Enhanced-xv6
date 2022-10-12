@@ -154,7 +154,7 @@ usertrap(void)
 #endif
 
 #ifdef MLFQ
-      if (p->state == RUNNING)
+      if (p && p->state == RUNNING)
       {
         p->curr_run_time++;
 
@@ -169,7 +169,7 @@ usertrap(void)
 
         if (p->curr_run_time >= mlfq_queue.proc_queue_max_allowable_ticks[p->queue_num])
         {
-          deque(p->queue_num);
+          // remove_from_between(p->queue_num, p);
           enque(4 < p->queue_num + 1 ? 4 : p->queue_num + 1, p);
           yield();
         }
@@ -268,23 +268,27 @@ kerneltrap()
 
 #ifdef MLFQ
       struct proc *p = myproc();
-      if (p->state == RUNNING)
-        p->curr_run_time++;
-
-      for (int i = 0; i < p->queue_num; i++)
+      if (p)
       {
-        if (mlfq_queue.proc_queue_size[i] != 0)
+        if (p->state == RUNNING)
+          p->curr_run_time++;
+
+        for (int i = 0; i < p->queue_num; i++)
         {
-          enque(p->queue_num, p);
+          if (mlfq_queue.proc_queue_size[i] != 0)
+          {
+            enque(p->queue_num, p);
+            yield();
+          }
+        }
+        
+        if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && p->curr_run_time >= mlfq_queue.proc_queue_max_allowable_ticks[p->queue_num])
+        {
+          // deque(p->queue_num);
+          // remove_from_between(p->queue_num, p);
+          enque(4 < p->queue_num + 1 ? 4 : p->queue_num + 1, p);
           yield();
         }
-      }
-      
-      if (which_dev == 2 && myproc() != 0 && myproc()->state == RUNNING && p->curr_run_time >= mlfq_queue.proc_queue_max_allowable_ticks[p->queue_num])
-      {
-        deque(p->queue_num);
-        enque(4 < p->queue_num + 1 ? 4 : p->queue_num + 1, p);
-        yield();
       }
 #endif
 
