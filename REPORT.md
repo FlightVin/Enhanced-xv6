@@ -12,6 +12,19 @@ When a process invokes a system call, it calls the `syscall` function. In this f
 When a process is freed in `freeproc`, `traceOpt` is reset to 0.  
 **Limitation**: The variable `traceOpt` is a signed integer(usually 32 bits long) since xv6 only provides the use of `argraw` within `sysproc.c`. Thus only the first 31 syscalls can be reliably traced. To get around this issue, `traceOpt` can be declared as `uint64`. This requires the addition of the declaration of `argraw` to `defs.h` for `syscall.c` and the replacement of `argint` calls with `argraw` where necessary. This has not been done to maintain the abstraction provided by `argint`,  `argaddr` and `argfd` and since it is quite unlikely that there will be an addition of so many system calls that will need to be traced.  
 
+### System calls 2 and 3 : `sigalarm and sigreturn`
+`int sigalarm(int, void*);`
+
+`int sigreturn(void);`
+
+We make the additions of `sigalarm_en` (to check if the process is inside an alarm sequence at the moment), `sigalarm_ticks` (to count the number of times that the process should have gotten a timer interrupt before calling the handler function), `sig_handler` (to store the handler function), `current_ticks_count` (to count the number of times that the process has gotten a timer interrupt) and `tm_backup` (the backup of the trapframe of the process) to `struct proc` in proc.h file.
+
+Trap.c has to be modified by making changes to the function `usertrap`. We add a section to check when the `devintr()` function returns 2 which corresponds to a timer interrupt. Here, we increment the `curret_ticks_count` by 1, and check if the conditions for a handler call have been satisfied. If so, we enable `sigalarm_en` and reinitialize `sigalarm_ticks_count` to 0. Further, create the copy of the `trapframe` in `tm_backup` and update the program counter, `epc`, to call the handler function.
+
+In `proc.c` we update `allocproc` to initialize the newly added attributes in `struct proc`. All information is set to 0 on `freeproc`.
+
+`sys_sigalarm` in `sysproc.c` just reads the information from registers passed by the `sigalarm` function and sets it into `sigalarm_ticks` and `sigalarm_handler`. `sys_sigreturn` copied the backup trapframe `tm_backup` back into the trapframe to counter the effect of changed registers by the handler function and sets `sigalarm_en` to 0 thereby saying that the sequence has ended. It returns the a0 register, i.e., the return value of the process that sigreturn was called on.
+
 ## Specification 2  
 ### FCFS(First Come First Serve)  
 Enable with : `make clean; make qemu SCHEDULER=FCFS`  
@@ -47,3 +60,8 @@ RR : Avg rtime 25, avg wtime 120
 FCFS :  Avg rtime 74, avg time 87  
 LBS : Average rtime 23,  wtime 133  
 PBS : Average rtime 32,  wtime 111
+
+## Specification 3
+### Copy-on-write
+
+The aim of this is 
