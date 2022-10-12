@@ -21,6 +21,5 @@ void enque(int queue_number, struct proc* p){
     }
 
     // initializations
-    mlfq_queue.proc_queues[mlfq_queue.proc_queue_size[queue_number]++] = p;
-    mlfq_queue.pro  
+    
 }
