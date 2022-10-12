@@ -192,3 +192,10 @@ void            virtio_disk_intr(void);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
+
+// mlfq.h
+void mlfq_queue_initialization(void); // initialize s with 0s
+void enque(int, struct proc*); // adds the process to the end of given queue
+struct proc* remove_from_between(int, struct proc*); // removes a given process from a queue
+struct proc* deque(int); // removes and returns the first element of given queue
+
