@@ -25,6 +25,8 @@ In `proc.c` we update `allocproc` to initialize the newly added attributes in `s
 
 `sys_sigalarm` in `sysproc.c` just reads the information from registers passed by the `sigalarm` function and sets it into `sigalarm_ticks` and `sigalarm_handler`. `sys_sigreturn` copied the backup trapframe `tm_backup` back into the trapframe to counter the effect of changed registers by the handler function and sets `sigalarm_en` to 0 thereby saying that the sequence has ended. It returns the a0 register, i.e., the return value of the process that sigreturn was called on.
 
+---
+
 ## Specification 2  
 ### FCFS(First Come First Serve)  
 Enable with : `make clean; make qemu SCHEDULER=FCFS`  
@@ -62,11 +64,36 @@ When a usertrap/kerneltrap occurs and we regain execution, we check if there are
 ## Analysis  
 RR : Avg rtime 25, avg wtime 120  
 FCFS :  Avg rtime 74, avg time 87  
-LBS : Average rtime 23,  wtime 133  
-PBS : Average rtime 32,  wtime 111  
+LBS : Average rtime 18,  wtime 119  
+PBS : Average rtime 25,  wtime 109  
 MLFQ : Average rtime 18,  wtime 167  
+
+---
 
 ## Specification 3
 ### Copy-on-write
 
-The aim of this is 
+We will need a new flag to check whether a pte references a physical page with copy-on-write implemented. Every pte's first 10 bits are reserved for flags with the 9th and 10th bit available for handling things according to programmer's discretion. We assign one of these two bits as `PTE_COW`.
+
+When a child process is created, it's memory is allocated using `uvmcopy` in `vm.c`. We will need to modify this function to map the child's (new) pagetable to the same physical address as that of the parent (old) process. So, we can update the function in the `for` loop to extract the flags of the pte received by `walk`ing the pagetable old by removing the write flag, `PTE_W`, and adding that we are handling copy-on-write using the `PTE_COW` flag. 
+
+After mapping the pte inside the `new` pagetable to the same physical address `pa` we need to handle the number of virtual addresses pointing to a physical page. To do this, we will need to maintain an array the size of the maximum number of physical pages. This array has been initiated in `kalloc.c`'s `kinit` with a spinlock `pte_updation_lock` to only allow one process to update the array at a given moment. Functions `increase_pte_count` and `decrease_pte_count` increment and decrement an element in the array `pte_count`. In `kalloc.c`, we also change `kfree` function to only fill in a memory block with jargon only if the number of ptes addressing it is 0. `kalloc` increases the number of ptes referencing the physical page.
+
+Now, a pagefault is generated whenever a write is executed in a copy-on-write enabled physical address since we disable the write flag. Here, we catch it in `trap.c` within the `usertrap` function using `r_scause() == 15` and then check whether the flags of the pte are valid. If not, we kill the process. If the flags are appropriate, we remove the `PTE_COW` flag and add the `PTE_W` flag before allocation memory for a new physical page, copying required contents from the old physical address and then changing the pte to reference the newly allocated physical address. 
+
+Finally, we also need to update the `copyout` function which copies from source to destination virtual address. We handle this the same way we handle page faults for copy-on-wrote in `trap.c`
+
+---
+
+## Specification 4
+
+Details about the implementation of the scheduling algorithms have been included under Specification 2
+
+Notable facts are - 
+1. FCFS has the least wait time because of no pre-emption
+2. MLFQ performs very well despite the constraint of using only one CPU
+
+### MLFQ Scheduling Analysis
+
+// to do 
+
