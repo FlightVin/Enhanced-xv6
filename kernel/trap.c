@@ -51,7 +51,7 @@ usertrap(void)
   // save user program counter.
   p->trapframe->epc = r_sepc();
   
- if (r_scause() == 15 || r_scause() == 13){
+ if (r_scause() == 15){
     // page fault
 
     // get lower page aligned address
