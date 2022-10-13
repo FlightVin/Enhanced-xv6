@@ -52,14 +52,19 @@ In `scheduler` function in `proc.c`, created variables to track the process with
 Since it is non preemptive, turn off yielding in `trap.c`.  
 
 ### Multilevel Feedback Queue
-Enable with : `make clean; make qemu SCHEDULER=MLFQ`  
+Enable with : `make clean; make qemu SCHEDULER=MLFQ CPUS=1`  
+Add `wait_time`, `is_in_queue`, `queue_num` and `curr_run_time` to `struct proc` in `proc.h`. Initialise these to 0 in `allocproc.c`. Update the waiting time in the `update_time` function.    
+Made `struct _mlfq_queue` to store information about the five queues. Made `mlfq.h` and `mlfq.c` to implement it. Offers functions to initialise(called in main), dequeue, enqueue and remove from middle.  
+In the `scheduler` function in `proc.c` we first put the processes in their correct queues. To do this, we iterate over all processes and check if the process has to be shifted to a higher queue(due to aging) or if a process is not in any queue, put it at the end of queue 0. After finishing this, try to dequeue a process from the queues in order from 0 to 4 and as soon as a process is found, run it.    
+When a usertrap/kerneltrap occurs and we regain execution, we check if there are any processes in a higher priority queue to execute. Also, we check if a process has exceeded its time slice and if so remove it from execution and put it in the lower priority queue.   
 **Exploitation of MLFQ by a process**: Since if a process exceeds its time slice it gets pushed to a lower queue but if voluntarily relinquishes control, it goes to the back of the same queue, a process can yield the CPU before its time slice expires to stay in the same queue, bypassing the deprioritasition. 
 
 ## Analysis  
 RR : Avg rtime 25, avg wtime 120  
 FCFS :  Avg rtime 74, avg time 87  
 LBS : Average rtime 23,  wtime 133  
-PBS : Average rtime 32,  wtime 111
+PBS : Average rtime 32,  wtime 111  
+MLFQ : Average rtime 18,  wtime 167  
 
 ## Specification 3
 ### Copy-on-write
