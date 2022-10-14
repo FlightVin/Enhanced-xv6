@@ -1,0 +1,85 @@
+((pid:9 ticks:35 queuenum:0))
+
+((pid:10 ticks:36 queuenum:0))
+
+((pid:11 ticks:37 queuenum:0))
+
+((pid:12 ticks:38 queuenum:0))
+
+((pid:13 ticks:39 queuenum:0))
+
+((pid:9 ticks:41 queuenum:1))
+
+((pid:10 ticks:43 queuenum:1))
+
+((pid:11 ticks:45 queuenum:1))
+
+((pid:12 ticks:47 queuenum:1))
+
+((pid:13 ticks:49 queuenum:1))
+
+((pid:9 ticks:53 queuenum:2))
+
+((pid:10 ticks:57 queuenum:2))
+
+((pid:11 ticks:61 queuenum:2))
+
+((pid:12 ticks:65 queuenum:2))
+
+((pid:13 ticks:69 queuenum:2))
+
+((pid:9 ticks:77 queuenum:3))
+
+((pid:10 ticks:85 queuenum:3))
+
+((pid:11 ticks:93 queuenum:3))
+
+((pid:12 ticks:101 queuenum:3))
+
+((pid:13 ticks:101 queuenum:3))
+
+((pid:13 ticks:105 queuenum:2))
+
+((pid:13 ticks:113 queuenum:3))
+
+((pid:9 ticks:113 queuenum:4))
+
+((pid:9 ticks:121 queuenum:3))
+
+((pid:10 ticks:121 queuenum:4))
+
+((pid:10 ticks:129 queuenum:3))
+
+((pid:11 ticks:129 queuenum:4))
+
+((pid:11 ticks:137 queuenum:3))
+
+((pid:12 ticks:137 queuenum:4))
+
+((pid:12 ticks:145 queuenum:3))
+
+((pid:13 ticks:145 queuenum:4))
+
+((pid:13 ticks:153 queuenum:3))
+
+((pid:9 ticks:153 queuenum:4))
+
+((pid:9 ticks:161 queuenum:3))
+
+((pid:10 ticks:161 queuenum:4))
+
+((pid:10 ticks:169 queuenum:3))
+
+((pid:11 ticks:169 queuenum:4))
+
+((pid:11 ticks:177 queuenum:3))
+
+((pid:12 ticks:177 queuenum:4))
+
+((pid:12 ticks:185 queuenum:3))
+
+((pid:13 ticks:185 queuenum:4))
+
+((pid:13 ticks:193 queuenum:3))
+
+((pid:9 ticks:193 queuenum:4))

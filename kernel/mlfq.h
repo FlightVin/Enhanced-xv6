@@ -8,4 +8,4 @@ struct _mlfq_queue{
 
 extern struct _mlfq_queue mlfq_queue;
 
-#define AGETIME 100
+#define AGETIME 30
