@@ -8,6 +8,7 @@
 #include "defs.h"
 
 #include "mlfq.h"
+#define MLFQTEST 0
 
 struct _mlfq_queue mlfq_queue;
 
@@ -32,6 +33,10 @@ void enque(int queue_number, struct proc* p){
     // initializations
     mlfq_queue.proc_queues[queue_number][mlfq_queue.proc_queue_size[queue_number]++] = p;
     
+    #ifdef MLFQTEST
+    printf("((pid:%d ticks:%d queuenum:%d))\n", p->pid, ticks, p->queue_num);
+    #endif
+
     p->wait_time = 0;
     p->queue_num = queue_number;
     p->is_in_queue = 1;

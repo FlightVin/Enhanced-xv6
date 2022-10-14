@@ -95,5 +95,5 @@ Notable facts are -
 
 ### MLFQ Scheduling Analysis
 
-// to do 
+![Loading mlfq analysis](mlfq_plot.png "MLFQ Analysis")
 
