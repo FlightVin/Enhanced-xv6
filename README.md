@@ -95,11 +95,11 @@ Notable facts are -
 
 ### MLFQ Scheduling Analysis
 
-Written in REPORT.md
+![Loading mlfq analysis](mlfq_plot.png "MLFQ Analysis")
 
 ---
----
 
+## From Source
 
 xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
 Version 6 (v6).  xv6 loosely follows the structure and style of v6,
