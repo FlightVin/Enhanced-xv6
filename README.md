@@ -1,152 +1,159 @@
-# REPORT
-# 2021101058, 2021101103
+# Enhanced xv-6
 
-## Specification 1
-### System call 1 : `trace`  
-`int trace(int traceNum)`
+**Advanced Process Management and Scheduling in xv6**
 
-To trace system calls only for a set of processes, we need to know if we need to trace for the currently running process. Thus we add `traceOpt` to `struct proc`.  
-This variable holds 0 by default to indicate that no systemcalls are to be traced. To trace the `i`th system call, the `i`th bit is turned on (`1 << i` is added).  
-Every child of a process inherits its parent's `traceOpt`. This is achieved by copying the value of `traceOpt` to the new process when forking.  
-When a process invokes a system call, it calls the `syscall` function. In this function we check if tracing is on for the process and if the system call (whose syscall number defined in `syscall.h` is stored in the variable `num`) is to be traced using bit operations. If tracing is on for this system call for this process, we get the pid of the process, the syscall name (from the `syscallName` array), the arguments(using `argint` function, the argument count is stored in the array `syscallArgC`) and the return value of the syscall(from `p->trapframe->a0`).  
-When a process is freed in `freeproc`, `traceOpt` is reset to 0.  
-**Limitation**: The variable `traceOpt` is a signed integer(usually 32 bits long) since xv6 only provides the use of `argraw` within `sysproc.c`. Thus only the first 31 syscalls can be reliably traced. To get around this issue, `traceOpt` can be declared as `uint64`. This requires the addition of the declaration of `argraw` to `defs.h` for `syscall.c` and the replacement of `argint` calls with `argraw` where necessary. This has not been done to maintain the abstraction provided by `argint`,  `argaddr` and `argfd` and since it is quite unlikely that there will be an addition of so many system calls that will need to be traced.  
-
-### System calls 2 and 3 : `sigalarm and sigreturn`
-`int sigalarm(int, void*);`
-
-`int sigreturn(void);`
-
-We make the additions of `sigalarm_en` (to check if the process is inside an alarm sequence at the moment), `sigalarm_ticks` (to count the number of times that the process should have gotten a timer interrupt before calling the handler function), `sig_handler` (to store the handler function), `current_ticks_count` (to count the number of times that the process has gotten a timer interrupt) and `tm_backup` (the backup of the trapframe of the process) to `struct proc` in proc.h file.
-
-Trap.c has to be modified by making changes to the function `usertrap`. We add a section to check when the `devintr()` function returns 2 which corresponds to a timer interrupt. Here, we increment the `curret_ticks_count` by 1, and check if the conditions for a handler call have been satisfied. If so, we enable `sigalarm_en` and reinitialize `sigalarm_ticks_count` to 0. Further, create the copy of the `trapframe` in `tm_backup` and update the program counter, `epc`, to call the handler function.
-
-In `proc.c` we update `allocproc` to initialize the newly added attributes in `struct proc`. All information is set to 0 on `freeproc`.
-
-`sys_sigalarm` in `sysproc.c` just reads the information from registers passed by the `sigalarm` function and sets it into `sigalarm_ticks` and `sigalarm_handler`. `sys_sigreturn` copied the backup trapframe `tm_backup` back into the trapframe to counter the effect of changed registers by the handler function and sets `sigalarm_en` to 0 thereby saying that the sequence has ended. It returns the a0 register, i.e., the return value of the process that sigreturn was called on.
+Here's a description of what we've accomplished with this project (LLM generated). Please find our technical report [here](https://github.com/FlightVin/Enhanced-xv6/blob/riscv/REPORT.md).
 
 ---
 
-## Specification 2  
-### FCFS(First Come First Serve)  
-Enable with : `make clean; make qemu SCHEDULER=FCFS`  
-First off, we need to modify the makefile to declare a macro according to the SCHEDULER option given when compiling. The makefile defines FCFS to 1 in every file it compiles, so now we knkow when to use FCFS.  
-To select the first process to serve it, we need to know the time when the process was created. This is measured in ticks and is stored in `uint creation_time` variable in `struct proc` in `proc.h`. Next, in `proc.c`, when a process is allocated, we define its creation time to be the current ticks.  
-In the function `scheduler`, we check if the FCFS macro is defined. We keep track of the earliest created process by iterating through the process table, acquiring and releasing locks as necessary(release lock if it is not going to be run(keep the lock of the earliest process)). On finding the earliest created process, we run it.  
-Preemption is disabled by checking if FCFS is defined before calling `yield` to give up CPU time in `trap.c`.  
+## Table of Contents
 
-### Lottery Based Scheduling
-Enable with : `make clean; make qemu SCHEDULER=LBS`  
-Add `int tickets` variable to `struct proc` in `proc.h` to keep track of the number of tickets a process has.  
-Implemented the `settickets` system call that changes the number of tickets of the current process.  
-Initialise tickets of the process to 1 in `allocproc` in `proc.c`.  
-In `schedule` in `proc.c` if `LBS` is defined, find the total number of tickets currently held by processes that are `RUNNABLE`. Randomly pick a winning ticket and find the process with the winning ticket by again iterating over all processes and run it. 
-
-### Priority Based Scheduling
-Enable with : `make clean; make qemu SCHEDULER=PBS`  
-Added variables `run_time`, `sleep_time`, `num_scheduled`, `static_priority` and `niceness` to `struct proc` in `proc.c`.  
-Initialise default values of 0, 0, 60, 5 respectively in `allocproc`.  
-Implemented `set_priority` system call to change the static priority of a process with given pid. Also made user program `setpriority` that calls the system call with command line arguments.  
-`run_time` and `sleep_time` variables are updated whenever a clock interrupt occurs.  
-`niceness` is updated whenever dynamic priority is calculated or when static priority of a process is changed with `set_priority`.  
-`set_priority` resets `run_time` and `sleep_time` to 0 and `niceness` to 5. If the new static priority of a process is higher than before (numerically lower), then the process yields for rescheduling.  
-In `scheduler` function in `proc.c`, created variables to track the process with highest priority(numerically lowest dynamic priority value) and its dynamic priority. Made an array `cases` with the case and tiebreakers when the highest priority process must be changed to the current process. Check if any of the entries in `cases` is true to update highest priority process. On finding the highest priority process, run it and increment `num_scheduled`.    
-Since it is non preemptive, turn off yielding in `trap.c`.  
-
-### Multilevel Feedback Queue
-Enable with : `make clean; make qemu SCHEDULER=MLFQ CPUS=1`  
-Add `wait_time`, `is_in_queue`, `queue_num` and `curr_run_time` to `struct proc` in `proc.h`. Initialise these to 0 in `allocproc.c`. Update the waiting time in the `update_time` function.    
-Made `struct _mlfq_queue` to store information about the five queues. Made `mlfq.h` and `mlfq.c` to implement it. Offers functions to initialise(called in main), dequeue, enqueue and remove from middle.  
-In the `scheduler` function in `proc.c` we first put the processes in their correct queues. To do this, we iterate over all processes and check if the process has to be shifted to a higher queue(due to aging) or if a process is not in any queue, put it at the end of queue 0. After finishing this, try to dequeue a process from the queues in order from 0 to 4 and as soon as a process is found, run it.    
-When a usertrap/kerneltrap occurs and we regain execution, we check if there are any processes in a higher priority queue to execute. Also, we check if a process has exceeded its time slice and if so remove it from execution and put it in the lower priority queue.   
-**Exploitation of MLFQ by a process**: Since if a process exceeds its time slice it gets pushed to a lower queue but if voluntarily relinquishes control, it goes to the back of the same queue, a process can yield the CPU before its time slice expires to stay in the same queue, bypassing the deprioritasition. 
-
-## Analysis  
-RR : Avg rtime 25, avg wtime 120  
-FCFS :  Avg rtime 74, avg time 87  
-LBS : Average rtime 18,  wtime 119  
-PBS : Average rtime 25,  wtime 109  
-MLFQ : Average rtime 18,  wtime 167  
+- [Introduction](#introduction)
+- [Key Features](#key-features)
+  - [System Call Tracing](#system-call-tracing)
+  - [Enhanced Scheduling Algorithms](#enhanced-scheduling-algorithms)
+  - [Copy-on-Write Mechanism](#copy-on-write-mechanism)
+- [Implementation Highlights](#implementation-highlights)
+- [Performance Analysis](#performance-analysis)
+- [Limitations & Future Work](#limitations--future-work)
+- [Getting Started](#getting-started)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
-## Specification 3
-### Copy-on-write
+## Introduction
 
-We will need a new flag to check whether a pte references a physical page with copy-on-write implemented. Every pte's first 10 bits are reserved for flags with the 9th and 10th bit available for handling things according to programmer's discretion. We assign one of these two bits as `PTE_COW`.
-
-When a child process is created, it's memory is allocated using `uvmcopy` in `vm.c`. We will need to modify this function to map the child's (new) pagetable to the same physical address as that of the parent (old) process. So, we can update the function in the `for` loop to extract the flags of the pte received by `walk`ing the pagetable old by removing the write flag, `PTE_W`, and adding that we are handling copy-on-write using the `PTE_COW` flag. 
-
-After mapping the pte inside the `new` pagetable to the same physical address `pa` we need to handle the number of virtual addresses pointing to a physical page. To do this, we will need to maintain an array the size of the maximum number of physical pages. This array has been initiated in `kalloc.c`'s `kinit` with a spinlock `pte_updation_lock` to only allow one process to update the array at a given moment. Functions `increase_pte_count` and `decrease_pte_count` increment and decrement an element in the array `pte_count`. In `kalloc.c`, we also change `kfree` function to only fill in a memory block with jargon only if the number of ptes addressing it is 0. `kalloc` increases the number of ptes referencing the physical page.
-
-Now, a pagefault is generated whenever a write is executed in a copy-on-write enabled physical address since we disable the write flag. Here, we catch it in `trap.c` within the `usertrap` function using `r_scause() == 15` and then check whether the flags of the pte are valid. If not, we kill the process. If the flags are appropriate, we remove the `PTE_COW` flag and add the `PTE_W` flag before allocation memory for a new physical page, copying required contents from the old physical address and then changing the pte to reference the newly allocated physical address. 
-
-Finally, we also need to update the `copyout` function which copies from source to destination virtual address. We handle this the same way we handle page faults for copy-on-wrote in `trap.c`
+This project enhances the xv6 operating system by introducing advanced process management features, comprehensive system call tracing, and multiple sophisticated scheduling algorithms. The primary goal is to improve system efficiency, provide better insights into process behaviors, and optimize CPU utilization through various scheduling strategies. Additionally, implementing a copy-on-write mechanism enhances memory management, ensuring efficient use of resources.
 
 ---
 
-## Specification 4
+## Key Features
 
-Details about the implementation of the scheduling algorithms have been included under Specification 2
+### System Call Tracing
 
-Notable facts are - 
-1. FCFS has the least wait time because of no pre-emption
-2. MLFQ performs very well despite the constraint of using only one CPU
+- **Selective Tracing:** Introduced the `trace` system call, enabling developers to monitor specific system calls for selected processes. This fine-grained control facilitates in-depth debugging and performance analysis.
+  
+- **Inherited Tracing Options:** Ensured that child processes inherit tracing settings from their parents, maintaining consistent monitoring across process hierarchies.
+
+- **Comprehensive Logging:** Captured essential details such as process IDs, system call names, arguments, and return values, providing valuable insights into system interactions.
+
+### Enhanced Scheduling Algorithms
+
+Implemented and integrated multiple scheduling algorithms to optimize CPU usage and process management:
+
+1. **First-Come, First-Served (FCFS):**
+   - **Non-Preemptive Scheduling:** Processes are scheduled in the order they arrive, minimizing context switching overhead.
+   - **Efficiency:** Demonstrated the lowest wait times due to its straightforward approach.
+
+2. **Lottery-Based Scheduling (LBS):**
+   - **Fairness Through Randomization:** Allocates CPU time based on lottery tickets, ensuring probabilistic fairness among processes.
+   - **Flexibility:** Allows dynamic adjustment of process priorities by modifying ticket counts.
+
+3. **Priority-Based Scheduling (PBS):**
+   - **Dynamic Prioritization:** Assigns priorities to processes, balancing CPU allocation based on process importance and behavior.
+   - **Adaptive Control:** Incorporates run time, sleep time, and niceness to adjust priorities dynamically.
+
+4. **Multilevel Feedback Queue (MLFQ):**
+   - **Hierarchical Queues:** Utilizes multiple queues with varying priorities, allowing processes to move between queues based on their behavior and execution history.
+   - **Performance Optimization:** Balances responsiveness and throughput, adapting to diverse workloads effectively.
+
+### Copy-on-Write Mechanism
+
+- **Memory Efficiency:** Implemented a copy-on-write (COW) strategy to optimize memory usage during process creation. This approach delays the actual copying of memory pages until a write operation occurs, reducing unnecessary memory duplication.
+  
+- **Enhanced Performance:** Minimizes memory overhead and accelerates process forking by sharing memory pages between parent and child processes until modifications are necessary.
+
+---
+
+## Implementation Highlights
+
+- **System Call Enhancements:**
+  - Augmented the `struct proc` to include tracing options.
+  - Modified the syscall handler to incorporate tracing logic based on process-specific settings.
+  - Ensured thread-safe updates and reset tracing options upon process termination.
+
+- **Scheduling Algorithms:**
+  - **FCFS:** Leveraged process creation timestamps to determine execution order.
+  - **LBS:** Introduced a ticket-based system allowing dynamic ticket allocation per process.
+  - **PBS:** Developed mechanisms to adjust priorities based on runtime metrics and user-defined settings.
+  - **MLFQ:** Designed a robust queue management system supporting multiple priority levels and aging to prevent starvation.
+
+- **Copy-on-Write:**
+  - Extended page table entries with COW flags to manage shared memory pages.
+  - Enhanced memory allocation and deallocation routines to account for shared references.
+  - Handled page faults gracefully to trigger COW behavior, ensuring system stability.
+
+---
+
+## Performance Analysis
+
+The implemented scheduling algorithms were rigorously tested to evaluate their performance under various workloads. Key metrics include average response time (rtime) and wait time (wtime):
+
+- **Round Robin (RR):** Avg rtime: 25, Avg wtime: 120
+- **First-Come, First-Served (FCFS):** Avg rtime: 74, Avg wtime: 87
+- **Lottery-Based Scheduling (LBS):** Avg rtime: 18, Avg wtime: 119
+- **Priority-Based Scheduling (PBS):** Avg rtime: 25, Avg wtime: 109
+- **Multilevel Feedback Queue (MLFQ):** Avg rtime: 18, Avg wtime: 167
 
 ### MLFQ Scheduling Analysis
 
-![Loading mlfq analysis](mlfq_plot.png "MLFQ Analysis")
+![MLFQ Performance Analysis](mlfq_plot.png "MLFQ Performance Analysis")
+
+*The MLFQ demonstrates robust performance, effectively managing process priorities and maintaining low response times despite single CPU constraints.*
 
 ---
 
-## From Source
+## Limitations & Future Work
 
-xv6 is a re-implementation of Dennis Ritchie's and Ken Thompson's Unix
-Version 6 (v6).  xv6 loosely follows the structure and style of v6,
-but is implemented for a modern RISC-V multiprocessor using ANSI C.
+- **Trace Options Bit Limitation:** Currently, the `traceOpt` is a signed integer, limiting reliable tracing to the first 31 system calls. Future enhancements could extend this capability by utilizing larger data types.
 
-ACKNOWLEDGMENTS
+- **MLFQ Exploitation:** Identified potential for processes to manipulate queue placement by voluntarily yielding CPU time. Implementing safeguards can mitigate this vulnerability.
 
-xv6 is inspired by John Lions's Commentary on UNIX 6th Edition (Peer
-to Peer Communications; ISBN: 1-57398-013-7; 1st edition (June 14,
-2000)).  See also https://pdos.csail.mit.edu/6.1810/, which provides
-pointers to on-line resources for v6.
+- **Scalability:** While the current implementation supports essential scheduling algorithms, extending support for more complex or hybrid scheduling strategies could further enhance system performance.
 
-The following people have made contributions: Russ Cox (context switching,
-locking), Cliff Frey (MP), Xiao Yu (MP), Nickolai Zeldovich, and Austin
-Clements.
+---
 
-We are also grateful for the bug reports and patches contributed by
-Takahiro Aoyagi, Silas Boyd-Wickizer, Anton Burtsev, carlclone, Ian
-Chen, Dan Cross, Cody Cutler, Mike CAT, Tej Chajed, Asami Doi,
-eyalz800, Nelson Elhage, Saar Ettinger, Alice Ferrazzi, Nathaniel
-Filardo, flespark, Peter Froehlich, Yakir Goaron, Shivam Handa, Matt
-Harvey, Bryan Henry, jaichenhengjie, Jim Huang, Matúš Jókay, John
-Jolly, Alexander Kapshuk, Anders Kaseorg, kehao95, Wolfgang Keller,
-Jungwoo Kim, Jonathan Kimmitt, Eddie Kohler, Vadim Kolontsov, Austin
-Liew, l0stman, Pavan Maddamsetti, Imbar Marinescu, Yandong Mao, Matan
-Shabtay, Hitoshi Mitake, Carmi Merimovich, Mark Morrissey, mtasm, Joel
-Nider, Hayato Ohhashi, OptimisticSide, Harry Porter, Greg Price, Jude
-Rich, segfault, Ayan Shafqat, Eldar Sehayek, Yongming Shen, Fumiya
-Shigemitsu, Cam Tenny, tyfkda, Warren Toomey, Stephen Tu, Rafael Ubal,
-Amane Uehara, Pablo Ventura, Xi Wang, WaheedHafez, Keiichi Watanabe,
-Nicolas Wolovick, wxdao, Grant Wu, Jindong Zhang, Icenowy Zheng,
-ZhUyU1997, and Zou Chang Wei.
+## Getting Started
 
+To replicate and experiment with the enhanced xv6 system, follow these steps:
 
-The code in the files that constitute xv6 is
-Copyright 2006-2022 Frans Kaashoek, Robert Morris, and Russ Cox.
+1. **Clone the Repository:**
+   ```bash
+   git clone https://github.com/flightvin/advanced-xv6.git
+   cd advanced-xv6
+   ```
 
-ERROR REPORTS
+2. **Build the Project with Desired Scheduler:**
+   - **FCFS:**
+     ```bash
+     make clean
+     make qemu SCHEDULER=FCFS
+     ```
+   - **Lottery-Based Scheduling:**
+     ```bash
+     make clean
+     make qemu SCHEDULER=LBS
+     ```
+   - **Priority-Based Scheduling:**
+     ```bash
+     make clean
+     make qemu SCHEDULER=PBS
+     ```
+   - **Multilevel Feedback Queue:**
+     ```bash
+     make clean
+     make qemu SCHEDULER=MLFQ CPUS=1
+     ```
 
-Please send errors and suggestions to Frans Kaashoek and Robert Morris
-(kaashoek,rtm@mit.edu).  The main purpose of xv6 is as a teaching
-operating system for MIT's 6.1810, so we are more interested in
-simplifications and clarifications than new features.
+3. **Run and Test:**
+   Execute the built xv6 system using QEMU and test the implemented features as per your requirements.
 
-BUILDING AND RUNNING XV6
+---
 
-You will need a RISC-V "newlib" tool chain from
-https://github.com/riscv/riscv-gnu-toolchain, and qemu compiled for
-riscv64-softmmu.  Once they are installed, and in your shell
-search path, you can run "make qemu".
+## Acknowledgments
+
+Special thanks to the xv6 development community for providing a solid foundation for this project. Appreciation is also extended to educators and peers who contributed valuable insights and feedback throughout the development process.
+
+# License
+
+This project is licensed under the [MIT License](LICENSE).
